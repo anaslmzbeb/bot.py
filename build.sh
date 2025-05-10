@@ -1,37 +1,39 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
-# Path to the C source
-SOURCE="bot.build/bot.c"
+# the Python entry-point you want to compile
+SCRIPT="bot.py"
 
-# Required link flags
-LDFLAGS="-lm -ldl"
+# make sure Nuitka is installed
+pip3 install --user nuitka
 
-# List of compilers and their output names
-declare -A compilers=(
-  [i486]="i486/bin/i486-gcc"
-  [i586]="i586/bin/i586-gcc"
-  [i686]="i686/bin/i686-gcc"
-  [m68k]="m68k/bin/m68k-gcc"
-  [mips]="mips/bin/mips-gcc"
-  [mipsel]="mipsel/bin/mipsel-gcc"
-  [powerpc]="powerpc/bin/powerpc-gcc"
-  [sh4]="sh4/bin/sh4-gcc"
-  [sparc]="sparc/bin/sparc-gcc"
-  [armv4l]="armv4l/bin/armv4l-gcc"
-  [armv5l]="armv5l/bin/armv5l-gcc"
-  [armv6l]="armv6l/bin/armv6l-gcc"
-  [armv7l]="armv7l/bin/armv7l-gcc"
-  [powerpc-440fp]="powerpc-440fp/bin/powerpc-440fp-gcc"
-  [x86_64]="x86_64/bin/x86_64-gcc"
-)
+# list of architectures (folders you have)
+ARCHS=(i486 i586 i686 m68k mips mipsel powerpc sh4 sparc \
+       armv4l armv5l armv6l armv7l powerpc-440fp x86_64)
 
-# Loop and compile
-for arch in "${!compilers[@]}"; do
-  COMPILER="${compilers[$arch]}"
-  if [ -f "$COMPILER" ]; then
-    echo "Compiling for $arch..."
-    "$COMPILER" -o "bot_$arch" "$SOURCE" $LDFLAGS
-  else
-    echo "Compiler for $arch not found at $COMPILER"
+for arch in "${ARCHS[@]}"; do
+  TC_DIR="./$arch/bin"
+  CC="$TC_DIR/${arch}-gcc"
+  CXX="$TC_DIR/${arch}-g++"
+
+  if [[ ! -x "$CC" ]]; then
+    echo "⚠️  Skipping $arch — compiler not found at $CC"
+    continue
   fi
+
+  echo "🔨 Building for $arch…"
+
+  # create per-arch output dir
+  OUTDIR="build-$arch"
+  mkdir -p "$OUTDIR"
+
+  # drive Nuitka with your cross-compiler
+  CC="$CC" CXX="$CXX" \
+    python3 -m nuitka \
+      --standalone \
+      --onefile \
+      --output-dir="$OUTDIR" \
+      "$SCRIPT"
+
+  echo "✅ Done: $OUTDIR/$(basename "$SCRIPT" .py)"
 done
